@@ -83,6 +83,7 @@ bevy = { version = "0.16.0", default-features = false, features = [
     "tonemapping_luts",
     "multi_threaded",
     "png",
+    "jpeg",
 ] }
 noise = "0.9"
 turborand = "0.10"
@@ -180,4 +181,10 @@ doc-scrape-examples = false
 name = "split_screen"
 path = "examples/split_screen.rs"
 required-features = ["camera", "debug"]
+doc-scrape-examples = false
+
+[[example]]
+name = "ecef"
+path = "examples/ecef.rs"
+required-features = ["camera"]
 doc-scrape-examples = false
