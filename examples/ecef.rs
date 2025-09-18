@@ -13,6 +13,7 @@ use bevy_input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy_math::DVec3;
 use bevy_transform::TransformSystem;
 use big_space::prelude::*;
+use std::fmt::Write as _;
 
 const EARTH_RADIUS_M: f64 = 6_371_000.0; // mean radius (m)
 const CELL_SIZE_M: f64 = 10_000.0; // 10 km cells
@@ -37,7 +38,7 @@ fn main() {
         brightness: 5000.0,
         ..default()
     });
-    app.add_systems(Startup, setup);
+    app.add_systems(Startup, (setup, setup_ui));
     // Core orbit and gizmos
     app.add_systems(
         PostUpdate,
@@ -47,15 +48,10 @@ fn main() {
         ),
     );
     // Optional verbose debug systems
-    if DEBUG_LOGS {
-        app.add_systems(
-            PostUpdate,
-            (
-                debug_camera_position.after(orbit_camera_update),
-                check_rendering_setup.after(TransformSystem::TransformPropagate),
-            ),
-        );
-    }
+    app.add_systems(
+        PostUpdate,
+        update_debug_overlay.after(TransformSystem::TransformPropagate),
+    );
     app.run();
 }
 
@@ -168,6 +164,43 @@ fn setup(
     }
 }
 
+/// Build the debug overlay so players can see the floating-origin math in real time.
+fn setup_ui(mut commands: Commands) {
+    commands.spawn((
+        Text::new(String::new()),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        TextLayout::new_with_justify(JustifyText::Left),
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(12.0),
+            left: Val::Px(12.0),
+            ..default()
+        },
+        OrbitDebugText,
+    ));
+
+    commands.spawn((
+        Text::new("Controls:\n  Left-click + drag: Orbit\n  Mouse wheel: Zoom\n  R: Reset orbit"),
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+        TextLayout::new_with_justify(JustifyText::Left),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(12.0),
+            left: Val::Px(12.0),
+            ..default()
+        },
+        OrbitHintText,
+    ));
+}
+
 /// Captures both the current and target state of the orbit controller.
 #[derive(Component, Debug, Clone)]
 struct OrbitState {
@@ -234,6 +267,12 @@ impl OrbitState {
         }
     }
 }
+
+#[derive(Component)]
+struct OrbitDebugText;
+
+#[derive(Component)]
+struct OrbitHintText;
 
 impl Default for OrbitState {
     fn default() -> Self {
@@ -562,167 +601,70 @@ fn draw_earth_gizmos(
     }
 }
 
-/// Periodically print the camera and mesh setup to the console when debugging.
-fn check_rendering_setup(
-    q_cam: Query<(&Camera, &GlobalTransform, &Projection), With<FloatingOrigin>>,
-    q_meshes: Query<(&GlobalTransform, &Mesh3d, &Name)>,
-    mut frame_count: Local<u32>,
+/// Keep the on-screen overlay in sync with the floating-origin state.
+fn update_debug_overlay(
+    mut debug_text: Query<&mut Text, With<OrbitDebugText>>,
+    camera: Query<(Entity, &CellCoord, &Transform, &OrbitState), With<Camera>>,
+    grids: Grids,
 ) {
-    *frame_count += 1;
-    if *frame_count != 1 && *frame_count % 300 != 0 {
-        return; // Check once at start and every 5 seconds
-    }
-
-    println!("\n=== RENDERING CHECK ===");
-
-    // Check camera setup
-    if let Ok((camera, cam_gt, projection)) = q_cam.single() {
-        println!("Camera Rendering Info:");
-        println!("  Is active: {}", camera.is_active);
-        println!(
-            "  Camera at: {:.1}, {:.1}, {:.1}",
-            cam_gt.translation().x,
-            cam_gt.translation().y,
-            cam_gt.translation().z
-        );
-
-        if let Projection::Perspective(persp) = projection {
-            println!("  FOV: {:.1}°", persp.fov.to_degrees());
-            println!("  Near: {:.1}, Far: {:.1}", persp.near, persp.far);
-        }
-
-        // Check what should be in frustum
-        println!("\nChecking mesh visibility:");
-        for (mesh_gt, _mesh, name) in q_meshes.iter() {
-            let dist = (cam_gt.translation() - mesh_gt.translation()).length();
-            println!("  {} at distance {:.1} km", name.as_str(), dist / 1000.0);
-
-            // Basic frustum check
-            if let Projection::Perspective(persp) = projection {
-                if dist >= persp.near && dist <= persp.far {
-                    println!("    -> Within near/far planes!");
-                } else {
-                    println!("    -> OUTSIDE near/far planes!");
-                }
-            }
-        }
-    } else {
-        println!("ERROR: No camera with FloatingOrigin found!");
-    }
-}
-
-/// Emit detailed per-frame camera diagnostics when verbose logging is enabled.
-fn debug_camera_position(
-    q_cam: Query<(&GlobalTransform, &CellCoord, &Transform, &OrbitState), With<Camera>>,
-    q_earth: Query<(&GlobalTransform, &CellCoord, &Transform, &Name), Without<Camera>>,
-    q_meshes: Query<(Entity, &Name, &GlobalTransform, Option<&Mesh3d>)>,
-    mut frame_count: Local<u32>,
-) {
-    *frame_count += 1;
-
-    // Print every 60 frames
-    if *frame_count % 60 != 0 {
+    let Ok(mut debug_text) = debug_text.single_mut() else {
         return;
-    }
+    };
+    let Ok((entity, cell, local_transform, orbit)) = camera.single() else {
+        return;
+    };
+    let Some(grid) = grids.parent_grid(entity) else {
+        return;
+    };
 
-    if let Ok((cam_gt, cell, transform, orbit)) = q_cam.single() {
-        println!("\n=== Frame {} Debug ===", *frame_count);
-        println!(
-            "Camera: cell=[{}, {}, {}] local={:.1},{:.1},{:.1}",
-            cell.x,
-            cell.y,
-            cell.z,
-            transform.translation.x,
-            transform.translation.y,
-            transform.translation.z
-        );
-        println!(
-            "  GlobalTransform: pos={:.1},{:.1},{:.1}",
-            cam_gt.translation().x,
-            cam_gt.translation().y,
-            cam_gt.translation().z
-        );
-        println!(
-            "  Orbit: dist={:.1}km yaw={:.2}° pitch={:.2}°",
-            orbit.distance / 1000.0,
-            orbit.yaw.to_degrees(),
-            orbit.pitch.to_degrees()
-        );
+    let world_position = grid.grid_position_double(cell, local_transform);
+    let world_radius_km = world_position.length() / 1000.0;
+    let altitude_km = world_radius_km - EARTH_RADIUS_M / 1000.0;
+    let local_offset = local_transform.translation;
+    let cell_edge_length_km = grid.cell_edge_length() as f64 / 1000.0;
 
-        // Check all meshes
-        println!("\nAll meshes in scene:");
-        for (entity, name, gt, mesh) in q_meshes.iter() {
-            let mesh_info = if mesh.is_some() {
-                "HAS MESH"
-            } else {
-                "NO MESH"
-            };
-            println!(
-                "  Entity {:?} '{}': {} at {:.1},{:.1},{:.1}",
-                entity,
-                name.as_str(),
-                mesh_info,
-                gt.translation().x,
-                gt.translation().y,
-                gt.translation().z
-            );
+    let mut buffer = String::with_capacity(256);
+    let _ = writeln!(
+        buffer,
+        "Grid cell: [{}, {}, {}] (edge {:.1} km)",
+        cell.x, cell.y, cell.z, cell_edge_length_km
+    );
+    let _ = writeln!(
+        buffer,
+        "Local offset: {:.1}, {:.1}, {:.1} km",
+        local_offset.x as f64 / 1000.0,
+        local_offset.y as f64 / 1000.0,
+        local_offset.z as f64 / 1000.0
+    );
+    let _ = writeln!(
+        buffer,
+        "World position: {:.1}, {:.1}, {:.1} km",
+        world_position.x / 1000.0,
+        world_position.y / 1000.0,
+        world_position.z / 1000.0
+    );
+    let _ = writeln!(
+        buffer,
+        "Altitude: {:.1} km (radius {:.1} km)",
+        altitude_km, world_radius_km
+    );
+    let _ = writeln!(
+        buffer,
+        "Latitude (pitch): {:.2} deg | Longitude (yaw): {:.2} deg",
+        orbit.pitch.to_degrees(),
+        orbit.yaw.to_degrees()
+    );
+    let _ = writeln!(
+        buffer,
+        "Distance: {:.1} km -> target {:.1} km",
+        orbit.distance / 1000.0,
+        orbit.desired_distance / 1000.0
+    );
+    let _ = writeln!(
+        buffer,
+        "Smoothing: angle {:.2}s | zoom {:.2}s",
+        orbit.angular_smooth_time, orbit.zoom_smooth_time
+    );
 
-            // Calculate distance from camera
-            let dist = (cam_gt.translation() - gt.translation()).length();
-            println!("    Distance from camera: {:.1} km", dist / 1000.0);
-
-            // Check if it should be visible
-            if dist < (orbit.distance * 2.0) as f32 {
-                println!("    >>> SHOULD BE VISIBLE <<<");
-            }
-        }
-
-        // Check Earth specifically
-        for (earth_gt, earth_cell, earth_transform, name) in q_earth.iter() {
-            if name.as_str() == "Earth" {
-                println!("\nEarth Entity Details:");
-                println!(
-                    "  Cell: [{}, {}, {}]",
-                    earth_cell.x, earth_cell.y, earth_cell.z
-                );
-                println!(
-                    "  Local Transform: pos={:.1},{:.1},{:.1} scale={:.1},{:.1},{:.1}",
-                    earth_transform.translation.x,
-                    earth_transform.translation.y,
-                    earth_transform.translation.z,
-                    earth_transform.scale.x,
-                    earth_transform.scale.y,
-                    earth_transform.scale.z
-                );
-                println!(
-                    "  GlobalTransform: pos={:.1},{:.1},{:.1}",
-                    earth_gt.translation().x,
-                    earth_gt.translation().y,
-                    earth_gt.translation().z
-                );
-
-                let distance = (cam_gt.translation() - earth_gt.translation()).length();
-                println!("  Distance to camera: {:.1} km", distance / 1000.0);
-            }
-        }
-    }
-
-    // First frame - detailed spawn check
-    if *frame_count == 60 {
-        println!("\n=== INITIAL SPAWN CHECK ===");
-        let earth_count = q_earth
-            .iter()
-            .filter(|(_, _, _, n)| n.as_str() == "Earth")
-            .count();
-        let debug_count = q_earth
-            .iter()
-            .filter(|(_, _, _, n)| n.as_str() == "DebugSphere")
-            .count();
-        let cam_count = q_cam.iter().count();
-        let total_meshes = q_meshes.iter().count();
-        println!("Cameras: {}", cam_count);
-        println!("Earth entities: {}", earth_count);
-        println!("Debug sphere entities: {}", debug_count);
-        println!("Total entities with names: {}", total_meshes);
-    }
+    *debug_text = Text::new(buffer);
 }
