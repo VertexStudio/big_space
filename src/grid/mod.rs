@@ -27,9 +27,11 @@ pub mod propagation;
 /// point in the hierarchy have accumulated the least error. Grids are transformed relative to each
 /// other using 64-bit float transforms.
 #[derive(Debug, Clone, Reflect, Component)]
-#[reflect(Component)]
-// We do not require the Transform, GlobalTransform, or GridCell, because these are not required in
-// all cases: e.g. BigSpace should not have a Transform or GridCell.
+#[reflect(Component, Default)]
+// We do not require `Transform` or `CellCoord`, because they must not exist in all cases: a
+// `BigSpace` root grid must not have a `Transform` or `CellCoord`, while nested grids must.
+// `GlobalTransform` is required in both cases.
+#[require(GlobalTransform)]
 pub struct Grid {
     /// The high-precision position of the floating origin's current grid cell local to this grid.
     local_floating_origin: LocalFloatingOrigin,

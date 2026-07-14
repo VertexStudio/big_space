@@ -2,6 +2,49 @@
 
 ## UNRELEASED
 
+### Updated: Bevy 0.19
+
+Updated to bevy `0.19.0`, adopting its new idioms end to end.
+
+### Removed: component bundles
+
+`BigSpatialBundle`, `BigGridBundle`, and `BigSpaceRootBundle` have been removed in favor of
+required components, matching bevy's direction since 0.15:
+
+- `BigSpace` requires `Grid` and `GlobalTransform` (and `Visibility` with the `camera` feature).
+  A big space root is now just `commands.spawn(BigSpace::default())`.
+- `CellCoord` requires `Transform` and `GlobalTransform` (and `Visibility` with the `camera`
+  feature). A spatial entity is now just `spawn(CellCoord::default())`.
+- `FloatingOrigin` requires `CellCoord`, so `spawn(FloatingOrigin)` is a complete, valid origin.
+- `Grid` requires `GlobalTransform`. It intentionally does *not* require `Transform` or
+  `CellCoord`, because `BigSpace` roots must not have them.
+
+### Added: BSN (Bevy Scene Notation) support
+
+All `big_space` components implement `Default + Clone`, which makes them compatible with bevy
+0.19's `bsn!` templates out of the box — no extra dependency needed. Combined with the required
+components above, entire floating-origin worlds can be declared as data. See the new `bsn`
+example.
+
+### Added: `multi_threaded` feature
+
+Bevy 0.19 no longer implies parallel transform propagation via `std`; it is an explicit
+`multi_threaded` opt-in. `big_space` now mirrors this with a `multi_threaded` feature that
+enables the parallel code paths in `bevy_ecs`, `bevy_tasks`, and `bevy_transform`. Apps that
+depend on `bevy` with its `multi_threaded` feature get this automatically through feature
+unification.
+
+### Added: parent validation parity
+
+Bevy 0.19's `TransformPlugin` installs `ValidateParentHasComponentPlugin::<GlobalTransform>`,
+but `TransformPlugin` must be disabled while using `big_space`. `BigSpacePropagationPlugin` now
+installs it instead, so hierarchy misconfiguration warnings work the same as in a stock bevy app.
+
+### Added: debug cell labels
+
+`BigSpaceDebugSettings::label_cells` draws the coordinates of occupied cells using bevy 0.19
+text gizmos.
+
 ### Renamed types for consistency
 
 Redundant `Grid` prefix removed.

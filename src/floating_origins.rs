@@ -1,41 +1,47 @@
 //! A floating origin for camera-relative rendering, to maximize precision when converting to f32.
 
+use crate::grid::{cell::CellCoord, Grid};
 use bevy_ecs::prelude::*;
 use bevy_platform::collections::HashMap;
 use bevy_reflect::prelude::*;
+use bevy_transform::prelude::GlobalTransform;
 
 /// Marks the entity to use as the floating origin.
 ///
 /// This can also be thought of as the location of the low precision 32 bit rendering origin. More
 /// accurately, the *cell* that this entity is located in defines the position of the rendering
 /// origin. As this entity moves through space, the floating origin used for computing
-/// [`GlobalTransform`](bevy_transform::components::GlobalTransform)s will only change when the
+/// [`GlobalTransform`]s will only change when the
 /// entity moves into a new cell.
 ///
-/// The [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all entities within this
+/// The [`GlobalTransform`] of all entities within this
 /// [`BigSpace`] will be computed relative to this floating origin's cell. There should always be
 /// exactly one entity marked with this component within a [`BigSpace`].
-#[derive(Component, Reflect)]
-#[reflect(Component)]
+#[derive(Component, Default, Clone, Copy, Debug, Reflect)]
+#[reflect(Component, Default)]
+#[require(CellCoord)]
 pub struct FloatingOrigin;
 
-/// A "big space" is a hierarchy of high precision [`Grid`](crate::Grid)s, rendered relative to a
+/// A "big space" is a hierarchy of high precision [`Grid`]s, rendered relative to a
 /// [`FloatingOrigin`]. This component marks the root of a high precision hierarchy, and tracks the
 /// [`FloatingOrigin`] inside this hierarchy.
 ///
-/// This component must also be paired with a [`Grid`](crate::Grid), which defines the properties of
-/// this root grid. A hierarchy can have many nested [`Grid`](crate::Grid)s, but only one
+/// This component must also be paired with a [`Grid`], which defines the properties of
+/// this root grid. A hierarchy can have many nested [`Grid`]s, but only one
 /// [`BigSpace`], at the root.
 ///
 /// Your world can have multiple [`BigSpace`]s, and they will remain completely independent. Each
 /// big space uses the floating origin contained within it to compute the
-/// [`GlobalTransform`](bevy_transform::components::GlobalTransform) of all spatial entities within
+/// [`GlobalTransform`] of all spatial entities within
 /// that [`BigSpace`]. This is needed for features like split screen, where you may need to render
 /// the world from viewpoints that are very far from each other.
-#[derive(Debug, Default, Component, Reflect)]
-#[reflect(Component)]
-// We do not require Grid, because we want more control over when the grid is inserted, especially
-// with the command extension.
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component, Default)]
+// A `BigSpace` root must never have a `Transform` or `CellCoord`: the absence of `Transform` on
+// roots is what keeps bevy's low-precision propagation from touching high-precision hierarchies.
+// The required `Grid` is a default that commands like `spawn_big_space` overwrite on insert.
+#[require(Grid, GlobalTransform)]
+#[cfg_attr(feature = "bevy_camera", require(bevy_camera::visibility::Visibility))]
 pub struct BigSpace {
     /// Set the entity to use as the floating origin within this high precision hierarchy.
     ///
@@ -54,7 +60,7 @@ impl BigSpace {
     ) -> Option<Entity> {
         let floating_origin = self.floating_origin?;
         let origin_root_entity = parents.iter_ancestors(floating_origin).last()?;
-        Some(floating_origin).filter(|_| origin_root_entity == this_entity)
+        (origin_root_entity == this_entity).then_some(floating_origin)
     }
 
     /// Automatically update all [`BigSpace`]s, finding the current floating origin entity within

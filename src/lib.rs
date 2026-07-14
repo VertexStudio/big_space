@@ -208,7 +208,6 @@ use prelude::*;
 pub(crate) mod portable_par;
 
 pub mod bevy_compat;
-pub mod bundles;
 pub mod commands;
 pub mod floating_origins;
 pub mod grid;
@@ -233,7 +232,6 @@ mod tests;
 /// Common `big_space` imports.
 pub mod prelude {
     use crate::*;
-    pub use bundles::{BigGridBundle, BigSpaceRootBundle, BigSpatialBundle};
     pub use commands::{BigSpaceCommands, GridCommands, SpatialEntityCommands};
     pub use floating_origins::{BigSpace, FloatingOrigin};
     pub use grid::{
@@ -260,6 +258,8 @@ pub mod prelude {
 
     #[cfg(feature = "camera")]
     pub use camera::BigSpaceCameraController;
+    #[cfg(feature = "debug")]
+    pub use debug::{BigSpaceDebugPlugin, BigSpaceDebugSettings};
 }
 
 /// Contains the [`GridPrecision`] integer index type, which defines how much precision is available

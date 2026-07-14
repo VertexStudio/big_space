@@ -103,6 +103,10 @@ impl Plugin for BigSpaceCorePlugin {
 pub struct BigSpacePropagationPlugin;
 impl Plugin for BigSpacePropagationPlugin {
     fn build(&self, app: &mut App) {
+        // Bevy's `TransformPlugin` normally installs this validation, but it must be disabled
+        // while using `big_space`, so we install it here to keep parity.
+        app.add_plugins(bevy_app::ValidateParentHasComponentPlugin::<GlobalTransform>::default());
+
         let configs = || {
             (
                 Grid::tag_low_precision_roots // loose ordering on this set
@@ -141,7 +145,7 @@ impl Plugin for BigSpacePropagationPlugin {
             .add_systems(PostUpdate, (configs(), hp_system()));
 
         // These are the bevy transform propagation systems. Because these start from the root
-        // of the hierarchy, and BigSpace bundles (at the root) do not contain a Transform,
+        // of the hierarchy, and BigSpace roots do not contain a Transform,
         // these systems will not interact with any high-precision entities in `big_space`. These
         // systems are added for ecosystem compatibility with bevy, although the rendered
         // behavior might look strange if they share a camera with one using the floating

@@ -2,7 +2,6 @@
 
 use crate::prelude::*;
 use bevy_ecs::{prelude::*, relationship::RelatedSpawnerCommands};
-use bevy_transform::prelude::*;
 use smallvec::SmallVec;
 
 /// Adds `big_space` commands to bevy's `Commands`.
@@ -20,7 +19,7 @@ pub trait BigSpaceCommands {
 
 impl BigSpaceCommands for Commands<'_, '_> {
     fn spawn_big_space(&mut self, grid: Grid, root_grid: impl FnOnce(&mut GridCommands)) {
-        let mut entity_commands = self.spawn(BigSpaceRootBundle::default());
+        let mut entity_commands = self.spawn(BigSpace::default());
         let mut cmd = GridCommands {
             entity: entity_commands.id(),
             commands: entity_commands.commands(),
@@ -77,17 +76,12 @@ impl<'a> GridCommands<'a> {
 
     /// Add a high-precision spatial entity ([`CellCoord`]) to this grid, and insert the provided
     /// bundle.
+    ///
+    /// [`CellCoord`]'s required components supply the `Transform`, `GlobalTransform`, and
+    /// (with the `camera` feature) `Visibility` needed for a complete spatial entity.
     #[inline]
     pub fn spawn_spatial(&mut self, bundle: impl Bundle) -> SpatialEntityCommands<'_> {
-        let entity = self
-            .spawn((
-                #[cfg(feature = "bevy_camera")]
-                bevy_camera::visibility::Visibility::default(),
-                Transform::default(),
-                CellCoord::default(),
-            ))
-            .insert(bundle)
-            .id();
+        let entity = self.spawn(CellCoord::default()).insert(bundle).id();
 
         SpatialEntityCommands {
             entity,
@@ -133,13 +127,7 @@ impl<'a> GridCommands<'a> {
     #[inline]
     pub fn spawn_grid(&mut self, new_grid: Grid, bundle: impl Bundle) -> GridCommands<'_> {
         let entity = self
-            .spawn((
-                #[cfg(feature = "bevy_camera")]
-                bevy_camera::visibility::Visibility::default(),
-                Transform::default(),
-                CellCoord::default(),
-                Grid::default(),
-            ))
+            .spawn((CellCoord::default(), Grid::default()))
             .insert(bundle)
             .id();
 

@@ -9,10 +9,18 @@ use bevy_color::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_gizmos::prelude::*;
 use bevy_math::prelude::*;
-use bevy_reflect::Reflect;
+use bevy_reflect::prelude::*;
 use bevy_transform::prelude::*;
 use core::hash::Hasher;
 use core::marker::PhantomData;
+
+/// Runtime settings for [`BigSpaceDebugPlugin`].
+#[derive(Resource, Debug, Clone, Default, Reflect)]
+#[reflect(Resource, Default)]
+pub struct BigSpaceDebugSettings {
+    /// Label occupied cells with their [`CellCoord`] using text gizmos.
+    pub label_cells: bool,
+}
 
 /// This plugin will render the bounds of occupied grid cells.
 pub struct BigSpaceDebugPlugin<F: SpatialHashFilter = ()>(PhantomData<F>);
@@ -33,6 +41,8 @@ impl<F: SpatialHashFilter> BigSpaceDebugPlugin<F> {
 impl<F: SpatialHashFilter> Plugin for BigSpaceDebugPlugin<F> {
     fn build(&self, app: &mut App) {
         app.init_gizmo_group::<BigSpaceGizmoConfig>()
+            .register_type::<BigSpaceDebugSettings>()
+            .init_resource::<BigSpaceDebugSettings>()
             .add_systems(Startup, setup_gizmos)
             .add_systems(
                 PostUpdate,
@@ -80,6 +90,7 @@ fn partition_local_aabb(partition: &Partition, l: f32) -> bevy_camera::primitive
 /// Update the rendered debug bounds for the nearest partitions to the floating origin.
 fn update_debug_bounds<F: SpatialHashFilter>(
     mut gizmos: Gizmos,
+    settings: Res<BigSpaceDebugSettings>,
     partitions: Option<Res<PartitionLookup<F>>>,
     grids: Query<(&GlobalTransform, &Grid)>,
     origins: Query<(&CellCoord, &ChildOf), With<FloatingOrigin>>,
@@ -144,10 +155,20 @@ fn update_debug_bounds<F: SpatialHashFilter>(
             let center = [h.coord().x as i32, h.coord().y as i32, h.coord().z as i32];
             let local_trans = Transform::from_translation(IVec3::from(center).as_vec3() * l)
                 .with_scale(Vec3::splat(l));
-            gizmos.cube(
-                transform.mul_transform(local_trans),
-                Hsla::new(hue, 1.0, 0.5, 0.6),
-            );
+            let cell_transform = transform.mul_transform(local_trans);
+            gizmos.cube(cell_transform, Hsla::new(hue, 1.0, 0.5, 0.6));
+
+            // Label the cell with its coordinates using a text gizmo (bevy 0.19).
+            if settings.label_cells {
+                let coord = h.coord();
+                gizmos.text(
+                    Isometry3d::from_translation(cell_transform.translation()),
+                    &alloc::format!("{},{},{}", coord.x, coord.y, coord.z),
+                    14.0,
+                    Vec2::ZERO,
+                    Hsla::new(hue, 1.0, 0.8, 1.0),
+                );
+            }
         }
 
         // Draw partition AABB.

@@ -46,7 +46,10 @@ fn deep_hierarchy(c: &mut Criterion) {
         commands.spawn_big_space(Grid::new(10000.0, 0.0), |root| {
             let mut parent = root.spawn_grid_default(()).id();
             for _ in 0..N_SPAWN {
-                let child = root.commands().spawn(BigGridBundle::default()).id();
+                let child = root
+                    .commands()
+                    .spawn((CellCoord::default(), Grid::default()))
+                    .id();
                 root.commands().entity(parent).add_child(child);
                 parent = child;
             }

@@ -146,10 +146,7 @@ fn mark_ancestor_grids(
     parents: &Query<&ChildOf>,
 ) {
     let mut ancestor = start;
-    loop {
-        let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) else {
-            break;
-        };
+    while let Ok(mut dirty) = dirty_ticks.get_mut(ancestor) {
         // bypass_change_detection to avoid spurious Changed<GridDirtyTick> noise
         let d = dirty.bypass_change_detection();
         // Early exit: if already marked this tick, all ancestors were marked too
@@ -321,7 +318,7 @@ mod tests {
             BigSpaceStationaryPlugin,
         ));
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         // Resource should exist immediately (build detected TimePlugin).
         assert!(
@@ -373,7 +370,7 @@ mod tests {
             BigSpaceStationaryPlugin,
         ));
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         // Spawn BEFORE any update — this is the first-frame scenario.
         let entity = app
@@ -418,7 +415,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(BigSpaceMinimalPlugins);
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         let stationary = app
             .world_mut()
@@ -458,7 +455,7 @@ mod tests {
             .add_plugins(BigSpaceStationaryPlugin)
             .add_plugins(CellHashingPlugin::default());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         // FO at origin
         app.world_mut()
@@ -546,7 +543,7 @@ mod tests {
         app.add_plugins(BigSpaceMinimalPlugins);
         app.add_plugins(CellHashingPlugin::default());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         let stationary = app
             .world_mut()
@@ -585,7 +582,7 @@ mod tests {
         app.add_plugins(BigSpaceMinimalPlugins);
         app.add_plugins(CellHashingPlugin::default());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         let coord = CellCoord::new(1, 2, 3);
         let cell_id = CellId::new_manual(grid_entity, &coord);
@@ -630,7 +627,7 @@ mod tests {
             .add_plugins(BigSpaceStationaryPlugin)
             .add_plugins(CellHashingPlugin::default());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         let mut stationary_entities = Vec::new();
         for i in 0..100 {
@@ -726,7 +723,7 @@ mod tests {
         app.add_plugins(BigSpaceMinimalPlugins)
             .add_plugins(BigSpaceStationaryPlugin);
 
-        let root = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let root = app.world_mut().spawn(BigSpace::default()).id();
 
         // FO starts at cell (0, 0, 0)
         let fo = app
@@ -790,7 +787,7 @@ mod tests {
         app.add_plugins(BigSpaceMinimalPlugins)
             .add_plugins(BigSpaceStationaryPlugin);
 
-        let root = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let root = app.world_mut().spawn(BigSpace::default()).id();
 
         app.world_mut()
             .spawn((CellCoord::default(), FloatingOrigin))
@@ -841,7 +838,7 @@ mod tests {
                 app.add_plugins(BigSpaceStationaryPlugin);
             }
 
-            let root = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+            let root = app.world_mut().spawn(BigSpace::default()).id();
 
             let fo = app
                 .world_mut()
@@ -908,7 +905,7 @@ mod tests {
     fn stationary_plugin_excluded_from_minimal_plugins() {
         let mut app = App::new();
         app.add_plugins(BigSpaceMinimalPlugins);
-        let root = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let root = app.world_mut().spawn(BigSpace::default()).id();
         app.update();
         assert!(
             app.world().get::<GridDirtyTick>(root).is_none(),
@@ -928,7 +925,7 @@ mod tests {
             .add_plugins(BigSpaceStationaryPlugin)
             .add_plugins(CellHashingPlugin::default());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         // FO at origin
         app.world_mut()
@@ -1044,7 +1041,7 @@ mod tests {
             .add_plugins(BigSpaceStationaryPlugin)
             .add_plugins(CellHashingPlugin::default());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         app.world_mut()
             .spawn((CellCoord::default(), FloatingOrigin))
@@ -1137,7 +1134,7 @@ mod tests {
             .add_plugins(BigSpaceStationaryPlugin)
             .add_plugins(CellHashingPlugin::<With<TestBody>>::new());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         app.world_mut()
             .spawn((CellCoord::default(), FloatingOrigin))
@@ -1255,7 +1252,7 @@ mod tests {
             .add_plugins(PartitionPlugin::<With<TestBody>>::new())
             .add_plugins(PartitionChangePlugin::<With<TestBody>>::new());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         app.world_mut()
             .spawn((CellCoord::default(), FloatingOrigin))
@@ -1365,7 +1362,7 @@ mod tests {
             .add_plugins(CellHashingPlugin::<With<TagA>>::new())
             .add_plugins(CellHashingPlugin::<With<TagB>>::new());
 
-        let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+        let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
         app.world_mut()
             .spawn((CellCoord::default(), FloatingOrigin))

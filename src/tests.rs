@@ -25,7 +25,7 @@ fn changing_floating_origin_updates_global_transform() {
         .id();
 
     app.world_mut()
-        .spawn(BigSpaceRootBundle::default())
+        .spawn(BigSpace::default())
         .add_children(&[first, second]);
 
     app.update();
@@ -67,7 +67,7 @@ fn child_global_transforms_are_updated_when_floating_origin_changes() {
         .id();
 
     app.world_mut()
-        .spawn(BigSpaceRootBundle::default())
+        .spawn(BigSpace::default())
         .add_children(&[first, second]);
 
     app.update();
@@ -89,7 +89,7 @@ fn moving_entity_spawned_with_cellid_is_registered() {
     app.add_plugins(BigSpaceMinimalPlugins);
     app.add_plugins(CellHashingPlugin::default());
 
-    let grid_entity = app.world_mut().spawn(BigSpaceRootBundle::default()).id();
+    let grid_entity = app.world_mut().spawn(BigSpace::default()).id();
 
     let coord = CellCoord::new(1, 2, 3);
     let cell_id = CellId::new_manual(grid_entity, &coord);

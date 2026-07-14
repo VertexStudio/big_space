@@ -25,6 +25,7 @@ use bevy_transform::prelude::*;
 #[derive(Component, Default, Debug, PartialEq, Eq, Clone, Copy, Hash, Reflect)]
 #[reflect(Component, Default, PartialEq)]
 #[require(Transform, GlobalTransform)]
+#[cfg_attr(feature = "bevy_camera", require(bevy_camera::visibility::Visibility))]
 pub struct CellCoord {
     /// X coordinate of a cell in its parent [`Grid`].
     pub x: GridPrecision,
